@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KalimbaJam Duet - 合奏練習エンジン</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link
+href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap"
+rel="stylesheet">
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script>
+tailwind.config = {
+theme: {
+extend: {
+fontFamily: {
+sans: ['Noto Sans JP', 'sans-serif'],
+comfortaa: ['Comfortaa', 'cursive'],
+mono: ['JetBrains Mono', 'monospace'],
+},
+colors: {
+cosmic: { 50: '#f5f3ff', 900: '#0f172a', 950: '#0b0f19' },
+accent: { gold: '#fbbf24', indigo: '#818cf8', purple: '#c084fc' }
+}
+}}
+}
+</script>
+<style>
+body { background-color: #0b0f19; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.glass-card { background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(129, 140, 248, 0.15); backdrop-filter: blur(12px); }
+.active-beat-cell { background: rgba(251,191,36,0.25) !important; border-color: rgba(251,191,36,0.7) !important; transform: scale(1.06); }
+</style>
+</head>
+<body class="text-slate-200 min-h-screen flex justify-center items-center p-0 sm:p-4">
+<div class="w-full max-w-[480px] h-screen sm:h-[840px] sm:rounded-[36px] shadow-2xl relative overflow-hidden flex flex-col bg-gradient-to-b from-[#0f172a] via-[#11132e] to-[#0b0f19] border-0 sm:border-8 border-slate-800">
+
+<header class="pt-5 px-5 pb-3 flex items-center justify-between z-10 border-b border-white/5 bg-[#0f172a]/60 backdrop-blur-md">
+<div class="flex items-center gap-2">
+<span class="text-accent-gold text-lg"><i class="fa-solid fa-people-arrows"></i></span>
+<span class="font-comfortaa font-bold text-base bg-gradient-to-r from-accent-indigo to-accent-purple bg-clip-text text-transparent">KalimbaJam Duet</span>
+</div>
+<span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-accent-gold/15 text-accent-gold border border-accent-gold/30">合奏エンジン</span>
+</header>
+
+<main class="flex-grow overflow-y-auto no-scrollbar px-4 py-3 z-10 flex flex-col gap-3">
+
+<div class="glass-card p-4 rounded-2xl space-y-2">
+<h2 class="text-base font-bold text-white">星々の小径(合奏版)</h2>
+<p class="text-[10px] text-accent-indigo">90 BPM / Am→F→C→G→Dm→G→Am→Em</p>
+<p class="text-[10px] text-slate-400 leading-relaxed">
+低音(伴奏)は各小節1回、ルート音を柔らかく持続。上のメロディ音は1拍ごとに実際に鳴るよ。Takaはこのメロディに合わせて、または真似てカリンバを弾いてみてな。
+</p>
+</div>
+
+<div class="glass-card p-4 rounded-2xl space-y-3">
+<div class="flex items-center gap-3">
+<button id="playBtn" onclick="togglePlay()" class="w-11 h-11 rounded-full bg-gradient-to-r from-accent-indigo to-accent-purple flex items-center justify-center text-white shadow-md active:scale-95 transition-all">
+<i class="fa-solid fa-play ml-0.5" id="playIcon"></i>
+</button>
+<div class="flex-grow bg-slate-800 h-2 rounded-full overflow-hidden">
+<div id="progressBar" class="bg-gradient-to-r from-accent-indigo to-accent-purple h-full w-0 transition-all duration-150"></div>
+</div>
+<span id="timeCounter" class="text-[10px] font-mono text-accent-purple w-16 text-right">01/08小節</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-[10px] text-slate-400 w-20">メロディ音量</span>
+<input type="range" id="melodyVol" min="0" max="1" step="0.05" value="0.35" oninput="setMelodyVol(this.value)" class="flex-grow h-1 accent-accent-gold">
+</div>
+<div class="flex items-center gap-2">
+<span class="text-[10px] text-slate-400 w-20">伴奏音量</span>
+<input type="range" id="rootVol" min="0" max="1" step="0.05" value="0.18" oninput="setRootVol(this.value)" class="flex-grow h-1 accent-accent-indigo">
+</div>
+</div>
+
+<div class="glass-card p-4 rounded-2xl flex-grow flex flex-col gap-2">
+<div class="text-[10px] font-semibold text-slate-400 mb-1 flex justify-between">
+<span>拍ごとの実音表示</span>
+<span class="text-accent-gold">上段=メロディ / 下段=伴奏</span>
+</div>
+<div id="measureGrid" class="grid grid-cols-4 gap-2"></div>
+</div>
+
+<div class="glass-card p-3 rounded-2xl">
+<p class="text-[10px] text-slate-400 leading-relaxed">
+<i class="fa-solid fa-circle-info text-accent-indigo mr-1"></i>
+音割れ対策：各音の音量を声部数で正規化し、コンプレッサーの後段にリミッターを追加して0dBを超える瞬間を強制的にカットしてるよ。
+</p>
+</div>
+
+</main>
+
+<footer class="py-3 border-t border-white/5 flex justify-center items-center z-10 bg-[#0b0f19]/80 backdrop-blur-md">
+<span class="text-[10px] text-slate-500">合奏で、指を育てる🐹</span>
+</footer>
+</div>
+
+<script>
+// ===== 音名→周波数テーブル(カリンバCメジャー音域) =====
+const noteFreq = {
+"C": 261.63, "D": 293.66, "E": 329.63, "F": 349.23, "G": 392.00, "A": 440.00, "B": 493.88,
+"C'": 523.25, "D'": 587.33, "E'": 659.25, "F'": 698.46, "G'": 783.99
+};
+// 伴奏ルート音は1オクターブ下げて土台感を出す
+function rootFreqOf(letter) { return (noteFreq[letter] || noteFreq["C"]) * 0.5; }
+
+// ===== 楽曲データ：小節ごとに { root: 文字, melody: [4拍分の音名] } =====
+const song = {
+tempo: 90,
+measures: [
+{ root: "A", melody: ["A", "C'", "E'", "A"] },
+{ root: "F", melody: ["F", "A", "C'", "F"] },
+{ root: "C", melody: ["C", "E", "G", "C'"] },
+{ root: "G", melody: ["G", "B", "D'", "G"] },
+{ root: "D", melody: ["D", "F", "A", "D"] },
+{ root: "G", melody: ["G", "D'", "B", "G"] },
+{ root: "A", melody: ["A", "E'", "C'", "A"] },
+{ root: "E", melody: ["E", "G", "B", "E'"] }
+]
+};
+
+let audioCtx = null, masterGain = null, compressor = null, limiterShaper = null;
+let melodyGainVal = 0.35, rootGainVal = 0.18;
+let isPlaying = false, currentBeat = 0, currentMeasure = 0;
+let schedulerTimer = null, nextBeatTime = 0.0;
+const lookahead = 25.0, scheduleAheadTime = 0.1;
+const bpm = song.tempo;
+const totalMeasures = song.measures.length;
+
+function buildGrid() {
+const grid = document.getElementById('measureGrid');
+grid.innerHTML = '';
+for (let m = 0; m < totalMeasures; m++) {
+for (let b = 0; b < 4; b++) {
+const cell = document.createElement('div');
+cell.id = `cell-${m}-${b}`;
+cell.className = "border border-white/10 rounded-lg py-2 flex flex-col items-center justify-center bg-cosmic-950/60 transition-all duration-150";
+const noteEl = document.createElement('span');
+noteEl.className = "font-mono text-xs text-cyan-300 font-bold";
+noteEl.textContent = song.measures[m].melody[b];
+const rootEl = document.createElement('span');
+rootEl.className = "font-mono text-[9px] text-slate-500";
+rootEl.textContent = b === 0 ? song.measures[m].root : "";
+cell.appendChild(noteEl);
+cell.appendChild(rootEl);
+grid.appendChild(cell);
+}
+}
+}
+buildGrid();
+
+function setMelodyVol(v) { melodyGainVal = parseFloat(v); }
+function setRootVol(v) { rootGainVal = parseFloat(v); }
+
+function ensureAudio() {
+if (audioCtx) return;
+audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+// マスター
+masterGain = audioCtx.createGain();
+masterGain.gain.setValueAtTime(1.0, audioCtx.currentTime);
+
+// 音楽的コンプレッサー(自然な圧縮)
+compressor = audioCtx.createDynamicsCompressor();
+compressor.threshold.setValueAtTime(-18, audioCtx.currentTime);
+compressor.knee.setValueAtTime(10, audioCtx.currentTime);
+compressor.ratio.setValueAtTime(6, audioCtx.currentTime);
+compressor.attack.setValueAtTime(0.001, audioCtx.currentTime); // 反応を高速化
+compressor.release.setValueAtTime(0.15, audioCtx.currentTime);
+
+// 安全弁：ソフトクリップのWaveShaperで0dB超えを物理的に防ぐ
+limiterShaper = audioCtx.createWaveShaper();
+const curve = new Float32Array(1024);
+for (let i = 0; i < 1024; i++) {
+const x = (i / 1023) * 2 - 1;
+curve[i] = Math.tanh(x * 1.5) / Math.tanh(1.5); // 滑らかな飽和カーブ
+}
+limiterShaper.curve = curve;
+limiterShaper.oversample = '4x';
+
+masterGain.connect(compressor);
+compressor.connect(limiterShaper);
+limiterShaper.connect(audioCtx.destination);
+}
+
+// メロディ音：カリンバらしい短いピッチカート音
+function playMelodyNote(letter, time) {
+const freq = noteFreq[letter] || noteFreq["C"];
+const osc = audioCtx.createOscillator();
+const overtone = audioCtx.createOscillator();
+const gain = audioCtx.createGain();
+
+osc.type = 'triangle';
+osc.frequency.setValueAtTime(freq, time);
+overtone.type = 'sine';
+overtone.frequency.setValueAtTime(freq * 2, time);
+
+const overtoneGain = audioCtx.createGain();
+overtoneGain.gain.setValueAtTime(0.25, time);
+
+gain.gain.setValueAtTime(0.0, time);
+gain.gain.linearRampToValueAtTime(melodyGainVal, time + 0.006);
+gain.gain.exponentialRampToValueAtTime(0.001, time + 0.9);
+
+osc.connect(gain);
+overtone.connect(overtoneGain);
+overtoneGain.connect(gain);
+gain.connect(masterGain);
+
+osc.start(time); overtone.start(time);
+osc.stop(time + 1.0); overtone.stop(time + 1.0);
+}
+
+// 伴奏ルート音：小節頭で1回、柔らかく持続
+function playRootNote(letter, time) {
+const freq = rootFreqOf(letter);
+const osc = audioCtx.createOscillator();
+const gain = audioCtx.createGain();
+osc.type = 'sine';
+osc.frequency.setValueAtTime(freq, time);
+gain.gain.setValueAtTime(0.0, time);
+gain.gain.linearRampToValueAtTime(rootGainVal, time + 0.03);
+gain.gain.exponentialRampToValueAtTime(0.001, time + 1.6);
+osc.connect(gain);
+gain.connect(masterGain);
+osc.start(time);
+osc.stop(time + 1.7);
+}
+
+function scheduler() {
+while (nextBeatTime < audioCtx.currentTime + scheduleAheadTime) {
+scheduleBeat(currentMeasure, currentBeat, nextBeatTime);
+advance();
+}
+schedulerTimer = setTimeout(scheduler, lookahead);
+}
+
+function scheduleBeat(m, b, time) {
+const measure = song.measures[m];
+playMelodyNote(measure.melody[b], time);
+if (b === 0) playRootNote(measure.root, time);
+const delayMs = (time - audioCtx.currentTime) * 1000;
+setTimeout(() => highlightCell(m, b), Math.max(0, delayMs));
+}
+
+function advance() {
+nextBeatTime += 60.0 / bpm;
+currentBeat = (currentBeat + 1) % 4;
+if (currentBeat === 0) currentMeasure = (currentMeasure + 1) % totalMeasures;
+}
+
+let lastCell = null;
+function highlightCell(m, b) {
+if (lastCell) lastCell.classList.remove('active-beat-cell');
+const cell = document.getElementById(`cell-${m}-${b}`);
+if (cell) { cell.classList.add('active-beat-cell'); lastCell = cell; }
+const bar = document.getElementById('progressBar');
+const progress = ((m * 4 + b) / (totalMeasures * 4)) * 100;
+if (bar) bar.style.width = `${progress}%`;
+const timer = document.getElementById('timeCounter');
+if (timer) timer.textContent = `${String(m+1).padStart(2,'0')}/${String(totalMeasures).padStart(2,'0')}小節`;
+}
+
+function togglePlay() {
+ensureAudio();
+if (isPlaying) {
+isPlaying = false;
+clearTimeout(schedulerTimer);
+document.getElementById('playIcon').className = 'fa-solid fa-play ml-0.5';
+} else {
+isPlaying = true;
+currentBeat = 0; currentMeasure = 0;
+nextBeatTime = audioCtx.currentTime + 0.05;
+document.getElementById('playIcon').className = 'fa-solid fa-pause';
+scheduler();
+}
+}
+</script>
+</body>
+</html>
